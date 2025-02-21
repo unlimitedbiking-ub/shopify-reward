@@ -3,7 +3,7 @@
 client_id = "00a4f77afa6d214fb186b7bd67c4852f"
 name = "UNLIMITED-BIKING-APP"
 handle = "unlimited-biking-app"
-application_url = "https://seal-app-7cb69.ondigitalocean.app"
+application_url = "https://dat-contain-brighton-centers.trycloudflare.com"
 embedded = true
 
 [build]
@@ -17,9 +17,9 @@ scopes = "read_customers,read_inventory,read_orders,read_products,write_inventor
 
 [auth]
 redirect_urls = [
-  "https://seal-app-7cb69.ondigitalocean.app/auth/callback",
-  "https://seal-app-7cb69.ondigitalocean.app/auth/shopify/callback",
-  "https://seal-app-7cb69.ondigitalocean.app/api/auth/callback"
+  "https://dat-contain-brighton-centers.trycloudflare.com/auth/callback",
+  "https://dat-contain-brighton-centers.trycloudflare.com/auth/shopify/callback",
+  "https://dat-contain-brighton-centers.trycloudflare.com/api/auth/callback"
 ]
 
 [webhooks]

@@ -2,427 +2,307 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 
 export const action = async ({ request }) => {
-  try {
-    const { shop, session, topic, payload, admin } =
-      await authenticate.webhook(request);
+  const { shop, topic } = await authenticate.webhook(request);
 
-    console.log(`Received ${topic} webhook for ${shop}`);
+  console.log(`Received ${topic} webhook for ${shop}`);
+  // try {
+  //   const { shop, session, topic, payload, admin } =
+  //     await authenticate.webhook(request);
 
-    if (session) {
-      const productId = payload?.id;
+  //   console.log(`Received ${topic} webhook for ${shop}`);
 
-      const query = `
-        {
-          product(id: "gid://shopify/Product/${productId}") {
-            collections(first: 10) {
-              edges {
-                node {
-                  id
-                  title
-                  handle
-                }
-              }
-            }
-          }
-        }
-      `;
+  //   if (session) {
+  //     const productId = payload?.id;
 
-      const response = await admin?.graphql(query);
-      const data = await response?.json();
+  //     const query = `
+  //       {
+  //         product(id: "gid://shopify/Product/${productId}") {
+  //           collections(first: 10) {
+  //             edges {
+  //               node {
+  //                 id
+  //                 title
+  //                 handle
+  //               }
+  //             }
+  //           }
+  //         }
+  //       }
+  //     `;
 
-      const collections = data?.data?.product?.collections?.edges || [];
+  //     const response = await admin?.graphql(query);
+  //     const data = await response?.json();
 
-      if (collections?.length > 0) {
-        for (const collectionEdge of collections) {
-          const collection = collectionEdge?.node;
-          const collectionId = collection?.id?.split("/").pop();
+  //     const collections = data?.data?.product?.collections?.edges || [];
 
-          const existingCategory = await prisma?.category?.findUnique({
-            where: { collectionId: collectionId },
-          });
+  //     // if (collections?.length > 0) {
+  //     //   for (const collectionEdge of collections) {
+  //     //     const collection = collectionEdge?.node;
+  //     //     const collectionId = collection?.id?.split("/").pop();
 
-          if (existingCategory) {
-            const eliteGrossMargin = existingCategory?.eliteGrossMargin || 0;
-            const regularGrossMargin =
-              existingCategory?.regularGrossMargin || 0;
+  //     //     const existingCategory = await prisma?.category?.findUnique({
+  //     //       where: { collectionId: collectionId },
+  //     //     });
 
-            const productData = {
-              title: payload?.title,
-              collectionId: collectionId,
-            };
+  //     //     if (existingCategory) {
+  //     //       const eliteGrossMargin = existingCategory?.eliteGrossMargin || 0;
+  //     //       const regularGrossMargin =
+  //     //         existingCategory?.regularGrossMargin || 0;
 
-            await prisma?.product?.upsert({
-              where: { id: payload?.id?.toString() },
-              update: productData,
-              create: { ...productData, id: payload?.id?.toString() },
-            });
+  //     //       const productData = {
+  //     //         title: payload?.title,
+  //     //         collectionId: collectionId,
+  //     //       };
 
-            const variants = payload?.variants || [];
+  //     //       await prisma?.product?.upsert({
+  //     //         where: { id: payload?.id?.toString() },
+  //     //         update: productData,
+  //     //         create: { ...productData, id: payload?.id?.toString() },
+  //     //       });
 
-            for (const variant of variants) {
-              const inventoryItemId = variant?.inventory_item_id;
+  //     //       const variants = payload?.variants || [];
 
-              const inventoryQuery = `
-                {
-                  inventoryItem(id: "gid://shopify/InventoryItem/${inventoryItemId}") {
-                    unitCost {
-                      amount
-                    }
-                  }
-                }
-              `;
+  //     //       for (const variant of variants) {
+  //     //         const inventoryItemId = variant?.inventory_item_id;
 
-              const inventoryResponse = await admin?.graphql(inventoryQuery);
-              const inventoryData = await inventoryResponse?.json();
+  //     //         const inventoryQuery = `
+  //     //           {
+  //     //             inventoryItem(id: "gid://shopify/InventoryItem/${inventoryItemId}") {
+  //     //               unitCost {
+  //     //                 amount
+  //     //               }
+  //     //             }
+  //     //           }
+  //     //         `;
 
-              const salePrice = parseFloat(variant?.price) || 0;
-              const costPrice =
-                parseFloat(
-                  inventoryData?.data?.inventoryItem?.unitCost?.amount,
-                ) || 0;
-              const margin = ((salePrice - costPrice) / salePrice) * 100;
+  //     //         const inventoryResponse = await admin?.graphql(inventoryQuery);
+  //     //         const inventoryData = await inventoryResponse?.json();
 
-              const eliteReward = (margin * eliteGrossMargin) / 100;
-              const regularReward = (margin * regularGrossMargin) / 100;
+  //     //         const salePrice = parseFloat(variant?.price) || 0;
+  //     //         const costPrice =
+  //     //           parseFloat(
+  //     //             inventoryData?.data?.inventoryItem?.unitCost?.amount,
+  //     //           ) || 0;
+  //     //         const margin = ((salePrice - costPrice) / salePrice) * 100;
 
-              const eliteRewardDecimal = parseFloat(eliteReward?.toFixed(2));
-              const regularRewardDecimal = parseFloat(
-                regularReward?.toFixed(2),
-              );
+  //     //         const eliteReward = (margin * eliteGrossMargin) / 100;
+  //     //         const regularReward = (margin * regularGrossMargin) / 100;
 
-              const variantData = {
-                id: variant?.id?.toString(),
-                price: salePrice,
-                unitCost: costPrice,
-                productId: payload?.id?.toString(),
-                eliteReward: eliteRewardDecimal,
-                regularReward: regularRewardDecimal,
-              };
+  //     //         const eliteRewardDecimal = parseFloat(eliteReward?.toFixed(2));
+  //     //         const regularRewardDecimal = parseFloat(
+  //     //           regularReward?.toFixed(2),
+  //     //         );
 
-              const existingVariant = await prisma?.variant?.findUnique({
-                where: { id: variant?.id?.toString() },
-              });
+  //     //         const variantData = {
+  //     //           id: variant?.id?.toString(),
+  //     //           price: salePrice,
+  //     //           unitCost: costPrice,
+  //     //           productId: payload?.id?.toString(),
+  //     //           eliteReward: eliteRewardDecimal,
+  //     //           regularReward: regularRewardDecimal,
+  //     //         };
 
-              const isVariantChanged =
-                existingVariant?.price !== salePrice ||
-                existingVariant?.unitCost !== costPrice;
+  //     //         const existingVariant = await prisma?.variant?.findUnique({
+  //     //           where: { id: variant?.id?.toString() },
+  //     //         });
 
-              if (isVariantChanged) {
-                try {
-                  await prisma?.variant?.upsert({
-                    where: { id: variant?.id?.toString() },
-                    update: variantData,
-                    create: variantData,
-                  });
-                } catch (error) {
-                  console.error("Error updating variant:", error);
-                }
+  //     //         const isVariantChanged =
+  //     //           existingVariant?.price !== salePrice ||
+  //     //           existingVariant?.unitCost !== costPrice;
 
-                const variantMetafieldQuery = `
-                  mutation productVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
-                    productVariantsBulkUpdate(productId: $productId, variants: $variants) {
-                      product {
-                        id
-                      }
-                      productVariants {
-                        id
-                        metafields(first: 100) {
-                          edges {
-                            node {
-                              namespace
-                              key
-                              value
-                            }
-                          }
-                        }
-                      }
-                      userErrors {
-                        field
-                        message
-                      }
-                    }
-                  }
-                `;
+  //     //         if (isVariantChanged) {
+  //     //           try {
+  //     //             await prisma?.variant?.upsert({
+  //     //               where: { id: variant?.id?.toString() },
+  //     //               update: variantData,
+  //     //               create: variantData,
+  //     //             });
+  //     //           } catch (error) {
+  //     //             console.error("Error updating variant:", error);
+  //     //           }
 
-                const variables = {
-                  productId: `gid://shopify/Product/${productId}`,
-                  variants: [
-                    {
-                      id: `gid://shopify/ProductVariant/${variant?.id?.toString()}`,
-                      metafields: [
-                        {
-                          namespace: "rewards",
-                          key: "elite_reward",
-                          value: `${eliteRewardDecimal}`,
-                          type: "number_decimal",
-                        },
-                        {
-                          namespace: "rewards",
-                          key: "regular_reward",
-                          value: `${regularRewardDecimal}`,
-                          type: "number_decimal",
-                        },
-                      ],
-                    },
-                  ],
-                };
+  //     //           const variantMetafieldQuery = `
+  //     //             mutation productVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+  //     //               productVariantsBulkUpdate(productId: $productId, variants: $variants) {
+  //     //                 product {
+  //     //                   id
+  //     //                 }
+  //     //                 productVariants {
+  //     //                   id
+  //     //                   metafields(first: 100) {
+  //     //                     edges {
+  //     //                       node {
+  //     //                         namespace
+  //     //                         key
+  //     //                         value
+  //     //                       }
+  //     //                     }
+  //     //                   }
+  //     //                 }
+  //     //                 userErrors {
+  //     //                   field
+  //     //                   message
+  //     //                 }
+  //     //               }
+  //     //             }
+  //     //           `;
 
-                try {
-                  const metafieldResponse = await fetch(
-                    `https://${session?.shop}/admin/api/2024-10/graphql.json`,
-                    {
-                      method: "POST",
-                      headers: {
-                        "Content-Type": "application/json",
-                        "X-Shopify-Access-Token": `${session?.accessToken}`,
-                      },
-                      body: JSON.stringify({
-                        query: variantMetafieldQuery,
-                        variables: variables,
-                      }),
-                    },
-                  );
+  //     //           const variables = {
+  //     //             productId: `gid://shopify/Product/${productId}`,
+  //     //             variants: [
+  //     //               {
+  //     //                 id: `gid://shopify/ProductVariant/${variant?.id?.toString()}`,
+  //     //                 metafields: [
+  //     //                   {
+  //     //                     namespace: "rewards",
+  //     //                     key: "elite_reward",
+  //     //                     value: `${eliteRewardDecimal}`,
+  //     //                     type: "number_decimal",
+  //     //                   },
+  //     //                   {
+  //     //                     namespace: "rewards",
+  //     //                     key: "regular_reward",
+  //     //                     value: `${regularRewardDecimal}`,
+  //     //                     type: "number_decimal",
+  //     //                   },
+  //     //                 ],
+  //     //               },
+  //     //             ],
+  //     //           };
 
-                  if (!metafieldResponse.ok) {
-                    const errorDetails = await metafieldResponse.json();
-                    console.error("Error details:", errorDetails);
-                    throw new Error("Failed to update variant metafields");
-                  }
-                } catch (error) {
-                  console.error("Error updating variant metafields:", error);
-                }
-              }
-            }
+  //     //           try {
+  //     //             const metafieldResponse = await fetch(
+  //     //               `https://${session?.shop}/admin/api/2024-10/graphql.json`,
+  //     //               {
+  //     //                 method: "POST",
+  //     //                 headers: {
+  //     //                   "Content-Type": "application/json",
+  //     //                   "X-Shopify-Access-Token": `${session?.accessToken}`,
+  //     //                 },
+  //     //                 body: JSON.stringify({
+  //     //                   query: variantMetafieldQuery,
+  //     //                   variables: variables,
+  //     //                 }),
+  //     //               },
+  //     //             );
 
-            // for (const variant of variants) {
-            //   const inventoryItemId = variant?.inventory_item_id;
+  //     //             if (!metafieldResponse.ok) {
+  //     //               const errorDetails = await metafieldResponse.json();
+  //     //               console.error("Error details:", errorDetails);
+  //     //               throw new Error("Failed to update variant metafields");
+  //     //             }
+  //     //           } catch (error) {
+  //     //             console.error("Error updating variant metafields:", error);
+  //     //           }
+  //     //         }
+  //     //       }
+  //     //     } else {
+  //     //       const productId = payload?.id?.toString();
+  //     //       if (productId) {
+  //     //         const productVariants = await prisma?.variant?.findMany({
+  //     //           where: { productId: productId },
+  //     //         });
 
-            //   const inventoryQuery = `
-            //       {
-            //         inventoryItem(id: "gid://shopify/InventoryItem/${inventoryItemId}") {
-            //           unitCost {
-            //             amount
-            //           }
-            //         }
-            //       }
-            //     `;
+  //     //         const variantMetafieldQuery = `
+  //     //             mutation productVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+  //     //               productVariantsBulkUpdate(productId: $productId, variants: $variants) {
+  //     //                 product {
+  //     //                   id
+  //     //                 }
+  //     //                 productVariants {
+  //     //                   id
+  //     //                   metafields(first: 100) {
+  //     //                     edges {
+  //     //                       node {
+  //     //                         namespace
+  //     //                         key
+  //     //                         value
+  //     //                       }
+  //     //                     }
+  //     //                   }
+  //     //                 }
+  //     //                 userErrors {
+  //     //                   field
+  //     //                   message
+  //     //                 }
+  //     //               }
+  //     //             }
+  //     //           `;
 
-            //   const inventoryResponse = await admin?.graphql(inventoryQuery);
-            //   const inventoryData = await inventoryResponse?.json();
+  //     //         const variables = {
+  //     //           productId: `gid://shopify/Product/${productId}`,
+  //     //           variants: productVariants.map((variant) => ({
+  //     //             id: `gid://shopify/ProductVariant/${variant.id}`,
+  //     //             metafields: [
+  //     //               {
+  //     //                 namespace: "rewards",
+  //     //                 key: "elite_reward",
+  //     //                 value: "0",
+  //     //                 type: "number_decimal",
+  //     //               },
+  //     //               {
+  //     //                 namespace: "rewards",
+  //     //                 key: "regular_reward",
+  //     //                 value: "0",
+  //     //                 type: "number_decimal",
+  //     //               },
+  //     //             ],
+  //     //           })),
+  //     //         };
 
-            //   const salePrice = parseFloat(variant?.price) || 0;
-            //   const costPrice =
-            //     parseFloat(
-            //       inventoryData?.data?.inventoryItem?.unitCost?.amount,
-            //     ) || 0;
-            //   const margin = ((salePrice - costPrice) / salePrice) * 100;
+  //     //         try {
+  //     //           const metafieldResponse = await fetch(
+  //     //             `https://${session?.shop}/admin/api/2024-10/graphql.json`,
+  //     //             {
+  //     //               method: "POST",
+  //     //               headers: {
+  //     //                 "Content-Type": "application/json",
+  //     //                 "X-Shopify-Access-Token": `${session?.accessToken}`,
+  //     //               },
+  //     //               body: JSON.stringify({
+  //     //                 query: variantMetafieldQuery,
+  //     //                 variables: variables,
+  //     //               }),
+  //     //             },
+  //     //           );
 
-            //   const eliteReward = (margin * eliteGrossMargin) / 100;
-            //   const regularReward = (margin * regularGrossMargin) / 100;
+  //     //           if (!metafieldResponse.ok) {
+  //     //             const errorDetails = await metafieldResponse.json();
+  //     //             console.error("Error details:", errorDetails);
+  //     //             throw new Error("Failed to update variant metafields");
+  //     //           }
 
-            //   const eliteRewardDecimal = parseFloat(eliteReward?.toFixed(2));
-            //   const regularRewardDecimal = parseFloat(
-            //     regularReward?.toFixed(2),
-            //   );
+  //     //           const metafieldData = await metafieldResponse.json();
+  //     //         } catch (error) {
+  //     //           console.error("Error updating variant metafields:", error);
+  //     //         }
 
-            //   const variantMetafieldQuery = `
-            //       mutation productVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
-            //         productVariantsBulkUpdate(productId: $productId, variants: $variants) {
-            //           product {
-            //             id
-            //           }
-            //           productVariants {
-            //             id
-            //             metafields(first: 100) {
-            //               edges {
-            //                 node {
-            //                   namespace
-            //                   key
-            //                   value
-            //                 }
-            //               }
-            //             }
-            //           }
-            //           userErrors {
-            //             field
-            //             message
-            //           }
-            //         }
-            //       }
-            //     `;
+  //     //         try {
+  //     //           await prisma?.variant?.deleteMany({
+  //     //             where: { productId: productId },
+  //     //           });
 
-            //   const variables = {
-            //     productId: `gid://shopify/Product/${productId}`,
-            //     variants: [
-            //       {
-            //         id: `gid://shopify/ProductVariant/${variant?.id?.toString()}`,
-            //         metafields: [
-            //           {
-            //             namespace: "rewards",
-            //             key: "elite_reward",
-            //             value: `${eliteRewardDecimal}`,
-            //             type: "number_decimal",
-            //           },
-            //           {
-            //             namespace: "rewards",
-            //             key: "regular_reward",
-            //             value: `${regularRewardDecimal}`,
-            //             type: "number_decimal",
-            //           },
-            //         ],
-            //       },
-            //     ],
-            //   };
+  //     //           const existingProduct = await prisma?.product?.findUnique({
+  //     //             where: { id: productId },
+  //     //           });
 
-            //   try {
-            //     const metafieldResponse = await fetch(
-            //       `https://${session?.shop}/admin/api/2024-10/graphql.json`,
-            //       {
-            //         method: "POST",
-            //         headers: {
-            //           "Content-Type": "application/json",
-            //           "X-Shopify-Access-Token": `${session?.accessToken}`,
-            //         },
-            //         body: JSON.stringify({
-            //           query: variantMetafieldQuery,
-            //           variables: variables,
-            //         }),
-            //       },
-            //     );
+  //     //           if (existingProduct) {
+  //     //             await prisma?.product?.delete({
+  //     //               where: { id: productId },
+  //     //             });
+  //     //           }
+  //     //         } catch (error) {
+  //     //           console.error("Error during deletion:", error);
+  //     //         }
+  //     //       }
+  //     //     }
+  //     //   }
+  //     // }
+  //   }
 
-            //     if (!metafieldResponse.ok) {
-            //       const errorDetails = await metafieldResponse.json();
-            //       console.error("Error details:", errorDetails);
-            //       throw new Error("Failed to update variant metafields");
-            //     }
-
-            //     const metafieldData = await metafieldResponse.json();
-            //   } catch (error) {
-            //     console.error("Error updating variant metafields:", error);
-            //   }
-
-            //   const variantData = {
-            //     id: variant?.id?.toString(),
-            //     price: salePrice,
-            //     unitCost: costPrice,
-            //     productId: payload?.id?.toString(),
-            //     eliteReward: eliteRewardDecimal,
-            //     regularReward: regularRewardDecimal,
-            //   };
-
-            //   await prisma?.variant?.upsert({
-            //     where: { id: variant?.id?.toString() },
-            //     update: variantData,
-            //     create: variantData,
-            //   });
-            // }
-          } else {
-            const productId = payload?.id?.toString();
-            if (productId) {
-              const productVariants = await prisma?.variant?.findMany({
-                where: { productId: productId },
-              });
-
-              const variantMetafieldQuery = `
-                  mutation productVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
-                    productVariantsBulkUpdate(productId: $productId, variants: $variants) {
-                      product {
-                        id
-                      }
-                      productVariants {
-                        id
-                        metafields(first: 100) {
-                          edges {
-                            node {
-                              namespace
-                              key
-                              value
-                            }
-                          }
-                        }
-                      }
-                      userErrors {
-                        field
-                        message
-                      }
-                    }
-                  }
-                `;
-
-              const variables = {
-                productId: `gid://shopify/Product/${productId}`,
-                variants: productVariants.map((variant) => ({
-                  id: `gid://shopify/ProductVariant/${variant.id}`,
-                  metafields: [
-                    {
-                      namespace: "rewards",
-                      key: "elite_reward",
-                      value: "0",
-                      type: "number_decimal",
-                    },
-                    {
-                      namespace: "rewards",
-                      key: "regular_reward",
-                      value: "0",
-                      type: "number_decimal",
-                    },
-                  ],
-                })),
-              };
-
-              try {
-                const metafieldResponse = await fetch(
-                  `https://${session?.shop}/admin/api/2024-10/graphql.json`,
-                  {
-                    method: "POST",
-                    headers: {
-                      "Content-Type": "application/json",
-                      "X-Shopify-Access-Token": `${session?.accessToken}`,
-                    },
-                    body: JSON.stringify({
-                      query: variantMetafieldQuery,
-                      variables: variables,
-                    }),
-                  },
-                );
-
-                if (!metafieldResponse.ok) {
-                  const errorDetails = await metafieldResponse.json();
-                  console.error("Error details:", errorDetails);
-                  throw new Error("Failed to update variant metafields");
-                }
-
-                const metafieldData = await metafieldResponse.json();
-              } catch (error) {
-                console.error("Error updating variant metafields:", error);
-              }
-
-              try {
-                await prisma?.variant?.deleteMany({
-                  where: { productId: productId },
-                });
-
-                const existingProduct = await prisma?.product?.findUnique({
-                  where: { id: productId },
-                });
-
-                if (existingProduct) {
-                  await prisma?.product?.delete({
-                    where: { id: productId },
-                  });
-                }
-              } catch (error) {
-                console.error("Error during deletion:", error);
-              }
-            }
-          }
-        }
-      }
-    }
-
-    return new Response("Webhook handled successfully", { status: 200 });
-  } catch (error) {
-    console.error("Error handling product update webhook:", error);
-    return new Response("Error processing webhook", { status: 500 });
-  }
+  //   return new Response("Webhook handled successfully", { status: 200 });
+  // } catch (error) {
+  //   console.error("Error handling product update webhook:", error);
+  //   return new Response("Error processing webhook", { status: 500 });
+  // }
 };
