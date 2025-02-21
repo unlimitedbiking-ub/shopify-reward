@@ -37,9 +37,5 @@ api_version = "2024-10"
   topics = [ "products/create" ]
   uri = "/webhooks/products/create"
 
-  [[webhooks.subscriptions]]
-  topics = [ "products/update" ]
-  uri = "/webhooks/products/update"
-
 [pos]
 embedded = false
