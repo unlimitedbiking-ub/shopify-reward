@@ -1,5 +1,5 @@
 # Use the official Node.js image with Alpine
-FROM node:18-alpine
+FROM node:22-alpine
 
 # Expose application port
 EXPOSE 3000
