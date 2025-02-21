@@ -405,7 +405,7 @@ export const action = async ({ request }) => {
               id
               title
               handle
-              products (first: 100) {
+              products (first: 5) {
                 edges {
                   node {
                     id
