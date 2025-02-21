@@ -22,8 +22,6 @@ import {
 import prisma from "../db.server";
 
 export async function loader({ request }) {
-  const { admin, session } = await shopify?.authenticate?.admin(request);
-
   const categories = await getAllCategories();
 
   const orders = await prisma?.order?.findMany();
